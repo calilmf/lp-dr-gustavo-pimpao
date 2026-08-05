@@ -484,7 +484,7 @@ const injectionLandingPages = {
     contexts: [
       { title: 'Hérnia de disco e compressão nervosa', text: 'Dor irradiada, formigamento e alterações identificadas em exame.', icon: 'colunaHerniaDiscoIcon' },
       { title: 'Lombalgia crônica', text: 'Dor lombar persistente, com ou sem limitação de movimento.', icon: 'colunaLombarIcon' },
-      { title: 'Ciática', text: 'Dor irradiada para a perna, ligada à raiz nervosa.', icon: 'spineSegmentIcon' },
+      { title: 'Ciática', text: 'Dor irradiada para a perna, ligada à raiz nervosa.', icon: 'legOutlineIcon' },
       { title: 'Cervicalgia', text: 'Dor e rigidez no pescoço, por vezes com formigamento no braço.', icon: 'colunaCervicalIcon' },
       { title: 'Dificuldade na reabilitação', text: 'A dor pode limitar evolução em fisioterapia e retomada de função.', icon: 'personalInjuryIcon' },
     ],
@@ -1245,10 +1245,10 @@ function NerveIcon({ className = 'h-6 w-6' }) {
   )
 }
 
-function SpineSegmentIcon({ className = 'h-6 w-6' }) {
+function LegOutlineIcon({ className = 'h-6 w-6' }) {
   return (
     <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className={className} aria-hidden="true">
-      <path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M14.75 7.229c0-1.274 1.166-2.205 2.393-1.97c5.198.994 8.516 1.006 13.71.003c1.227-.237 2.397.694 2.397 1.97v.414H34a2 2 0 0 1 2 2v1.528a2 2 0 0 1-2 2h-.75v.878a1.99 1.99 0 0 1-1.498 1.931c-2.854.727-5.224 1.101-7.65 1.1c-2.424 0-4.856-.376-7.834-1.103a1.99 1.99 0 0 1-1.518-1.937v-.869H14a2 2 0 0 1-2-2V9.646a2 2 0 0 1 2-2h.75zm2 0v.417a2 2 0 0 1-2 2H14v1.528h.75a2 2 0 0 1 2 2v.865c2.886.704 5.147 1.044 7.353 1.044c2.203.001 4.397-.336 7.147-1.035v-.874a2 2 0 0 1 2-2H34V9.646h-.75a2 2 0 0 1-2-2v-.414l-.002-.002l-.008-.004h-.008c-5.448 1.052-9.022 1.039-14.465-.003h-.008l-.007.004z" />
+      <path fill="currentColor" d="M22.748 4H21.5a1 1 0 0 0-.975.78l-3.353 14.847A7 7 0 0 0 17 21.17v2.322a7 7 0 0 0 .385 2.29l3.854 11.133L15.814 39H13a1 1 0 0 0-1 1v1a3 3 0 0 0 3 3h3.32a3 3 0 0 0 .536-.048l4.011-.73a3 3 0 0 1 1.878.269l.061.03a3.934 3.934 0 0 0 4.747-6.08l-1.536-1.791l.369-8.115a9 9 0 0 0-1.359-5.178l-.779-1.247a54 54 0 0 0 3.699-4.727c2.143-3.09 4.511-7.254 5.044-11.25A1 1 0 0 0 34 4h-.667l-.529 2c-.717 3.181-2.62 6.531-4.5 9.242a52 52 0 0 1-3.704 4.712l-.31.34l-.014.017l-.004.003c-.311.331-.36.83-.12 1.216l1.18 1.886a7 7 0 0 1 1.056 4.028L26 35.954a1 1 0 0 0 .24.697l1.793 2.092a1.934 1.934 0 0 1-2.333 2.99l-.061-.031a5 5 0 0 0-3.13-.447l-4.012.729q-.088.015-.178.016H15a1 1 0 0 1-1-1h2a1 1 0 0 0 .359-.067l6.5-2.5a1 1 0 0 0 .586-1.26l-4.17-12.047A5 5 0 0 1 19 23.491v-2.322a5 5 0 0 1 .123-1.101z" />
     </svg>
   )
 }
@@ -1485,7 +1485,7 @@ const iconComponents = {
   colunaHerniaDiscoIcon: ColunaHerniaDiscoIcon,
   colunaSobrecargaIcon: ColunaSobrecargaIcon,
   nerveIcon: NerveIcon,
-  spineSegmentIcon: SpineSegmentIcon,
+  legOutlineIcon: LegOutlineIcon,
   personalInjuryIcon: PersonalInjuryIcon,
   bedIcon: BedIcon,
   ombroLevantarBracoIcon: OmbroLevantarBracoIcon,
