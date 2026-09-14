@@ -872,12 +872,85 @@ function track(event, payload = {}) {
   window.dataLayer.push({ event, ...payload })
 }
 
-function whatsappUrl({ name = '', phone = '', source = 'lp' } = {}) {
+// Gera (ou reaproveita) um código curto que identifica esta visita, para depois
+// ligar a conversa de WhatsApp ao clique registrado no beacon. Cai para uma
+// variável em memória quando sessionStorage não está disponível (modo privado).
+let refEmMemoria = null
+
+function gerarRefCurta() {
+  return `GP-${Math.floor(1000 + Math.random() * 9000)}`
+}
+
+function refDaVisita() {
+  try {
+    const armazenado = window.sessionStorage.getItem('gp_ref')
+    if (armazenado) return armazenado
+    const novoRef = gerarRefCurta()
+    window.sessionStorage.setItem('gp_ref', novoRef)
+    return novoRef
+  } catch (error) {
+    if (!refEmMemoria) refEmMemoria = gerarRefCurta()
+    return refEmMemoria
+  }
+}
+
+const WHATSAPP_CLICK_TRACK_URL = 'https://intelligence.calil.ia.br/v1/track/whatsapp-click/dr-gustavo-pimpao'
+
+// Envia um beacon de clique no WhatsApp sem nenhum dado pessoal (o endpoint
+// recusa nome/telefone/e-mail com 400). Nunca deve atrasar ou quebrar a navegação.
+function enviarCliqueWhatsapp(source) {
+  if (typeof window === 'undefined') return
+
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const pick = (key) => params.get(key) || undefined
+
+    const payload = {
+      ref: refDaVisita(),
+      pagina: source,
+      gclid: pick('gclid'),
+      gbraid: pick('gbraid'),
+      wbraid: pick('wbraid'),
+      fbclid: pick('fbclid'),
+      utm_source: pick('utm_source'),
+      utm_medium: pick('utm_medium'),
+      utm_campaign: pick('utm_campaign'),
+      utm_term: pick('utm_term'),
+      utm_content: pick('utm_content'),
+      // O endpoint recusa o corpo inteiro (400) se um campo passar do limite:
+      // landing_page_url 2048 e user_agent 500. Cortar aqui evita perder o clique.
+      landing_page_url: window.location.href.slice(0, 2000),
+      user_agent: (navigator.userAgent || "").slice(0, 480),
+    }
+
+    Object.keys(payload).forEach((key) => {
+      if (!payload[key]) delete payload[key]
+    })
+
+    const body = JSON.stringify(payload)
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(WHATSAPP_CLICK_TRACK_URL, body)
+    } else {
+      fetch(WHATSAPP_CLICK_TRACK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body,
+        keepalive: true,
+      }).catch(() => {})
+    }
+  } catch (error) {
+    // Rastreamento nunca deve bloquear ou quebrar a navegação para o WhatsApp.
+  }
+}
+
+function whatsappUrl({ name = '', phone = '', source = 'lp', ref = '' } = {}) {
   const message = [
     `Olá, vim pelo site do ${doctor.shortName}.`,
     name ? `Meu nome é ${name}.` : '',
     phone ? `Meu telefone é ${phone}.` : '',
     'Quero agendar uma avaliação ortopédica.',
+    ref ? `[${ref}]` : '',
   ].filter(Boolean).join(' ')
 
   return `https://wa.me/${doctor.phone}?text=${encodeURIComponent(message)}&utm_source=${source}&utm_medium=lp&utm_campaign=dr_gustavo_pimpao`
@@ -891,33 +964,12 @@ function isDirecionamentoPage() {
   return ['/agendar/', '/direcionamento/'].includes(getNormalizedPathname())
 }
 
-function getDirecionamentoUrl(source = 'lp') {
-  if (typeof window === 'undefined') return '/agendar/'
-  
-  const currentParams = new URLSearchParams(window.location.search)
-  const lpUrl = new URL(window.location.href)
-  currentParams.set('landing_page_url', lpUrl.origin + lpUrl.pathname)
-  currentParams.set('ponto_conversao', source)
-  if (document.referrer) {
-    currentParams.set('referrer_url', document.referrer)
-  }
-  
-  let basePath = '/'
-  const path = window.location.pathname
-  if (path.includes('/lp-dr-gustavo-pimpao')) {
-    basePath = '/lp-dr-gustavo-pimpao/'
-  } else if (path.startsWith('/lp')) {
-    basePath = '/lp/'
-  }
-  
-  return `${basePath}agendar/?${currentParams.toString()}`
-}
-
 function openLeadModal(event, source = 'lp') {
   event?.preventDefault()
   if (typeof window === 'undefined') return
   track('whatsapp_click', { location: source })
-  window.location.href = getDirecionamentoUrl(source)
+  enviarCliqueWhatsapp(source)
+  window.location.href = whatsappUrl({ source, ref: refDaVisita() })
 }
 
 
@@ -2649,97 +2701,42 @@ function SchemaJsonLd({ page = null }) {
 }
 
 function AgendarPage() {
-  const [progress, setProgress] = useState(0)
-  const [redirected, setRedirected] = useState(false)
+  const beaconEnviadoRef = useRef(false)
 
-  const redirectUrl = useMemo(() => {
-    if (typeof window === 'undefined') return ''
-
+  const source = useMemo(() => {
+    if (typeof window === 'undefined') return 'agendar_page'
     const params = new URLSearchParams(window.location.search)
-    const crmUrl = new URL('https://sistema.pulso.marketing/go/dr-gustavo-pimpao')
-
-    params.forEach((value, key) => {
-      crmUrl.searchParams.set(key, value)
-    })
-
-    if (!crmUrl.searchParams.has('landing_page_url')) {
-      const fallbackUrl = params.get('landing_page_url') || window.location.origin
-      crmUrl.searchParams.set('landing_page_url', fallbackUrl)
-    }
-
-    const messageText = 'Olá! Quero saber mais informações.'
-    crmUrl.searchParams.set('mensagem', messageText)
-
-    return crmUrl.toString()
+    return params.get('ponto_conversao') || 'agendar_page'
   }, [])
+
+  const redirectUrl = useMemo(() => whatsappUrl({ source, ref: refDaVisita() }), [source])
 
   useEffect(() => {
     document.title = 'Direcionando para o WhatsApp — Dr. Gustavo Pimpão'
 
-    const duration = 2500
-    const intervalTime = 30
-    const startTime = Date.now()
+    if (!beaconEnviadoRef.current) {
+      beaconEnviadoRef.current = true
+      track('whatsapp_click', { location: source })
+      enviarCliqueWhatsapp(source)
+    }
 
-    const timer = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const currentProgress = Math.min(elapsed / duration, 1)
-      setProgress(currentProgress)
-
-      if (currentProgress >= 1) {
-        clearInterval(timer)
-        if (!redirected && redirectUrl) {
-          setRedirected(true)
-          window.location.href = redirectUrl
-        }
-      }
-    }, intervalTime)
-
-    return () => clearInterval(timer)
-  }, [redirectUrl, redirected])
+    window.location.href = redirectUrl
+  }, [redirectUrl, source])
 
   const handleManualClick = () => {
-    if (redirectUrl) {
-      setRedirected(true)
-      window.location.href = redirectUrl
-    }
+    window.location.href = redirectUrl
   }
 
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col items-center justify-center px-4 py-8 font-sans select-none relative overflow-hidden mobile-readable">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(160,26,42,0.06)_0%,transparent_70%)] pointer-events-none z-0" />
-      
+
       <div className="relative z-10 w-full max-w-md bg-white rounded-[2.5rem] p-8 sm:p-10 shadow-soft border border-brand-graphite/5 text-center flex flex-col items-center">
-        
-        {/* SVG Circular Progress Loader */}
-        <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
-          <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-            <circle 
-              className="text-emerald-500/10" 
-              strokeWidth="6" 
-              stroke="currentColor" 
-              fill="transparent" 
-              r="44" 
-              cx="50" 
-              cy="50" 
-            />
-            <circle 
-              className="text-emerald-500 transition-all duration-75 ease-linear" 
-              strokeWidth="6" 
-              strokeDasharray={276.46}
-              strokeDashoffset={276.46 * (1 - progress)} 
-              strokeLinecap="round" 
-              stroke="currentColor" 
-              fill="transparent" 
-              r="44" 
-              cx="50" 
-              cy="50" 
-            />
+
+        <div className="w-20 h-20 mb-8 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.965C16.528 2.025 14.069.99 11.5.99c-5.438 0-9.863 4.37-9.868 9.8-.001 1.77.463 3.5 1.34 5.024L2.002 21.1l5.441-1.426-.8 1.48z" />
           </svg>
-          <div className="w-20 h-20 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
-            <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.965C16.528 2.025 14.069.99 11.5.99c-5.438 0-9.863 4.37-9.868 9.8-.001 1.77.463 3.5 1.34 5.024L2.002 21.1l5.441-1.426-.8 1.48z" />
-            </svg>
-          </div>
         </div>
 
         {/* Título e Texto Amistoso */}
@@ -2750,12 +2747,12 @@ function AgendarPage() {
           Conectando você ao atendimento do Dr. Gustavo Pimpão...
         </p>
 
-        {/* Botão de Redirecionamento Manual */}
-        <button 
+        {/* Botão de plano B, caso o redirecionamento automático não dispare */}
+        <button
           onClick={handleManualClick}
           className="w-full inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-brand-red text-white text-base sm:text-lg font-black uppercase tracking-wider shadow-lg shadow-brand-red/20 transition duration-300 hover:bg-brand-red-dark hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
         >
-          Conectar agora
+          Abrir o WhatsApp
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
