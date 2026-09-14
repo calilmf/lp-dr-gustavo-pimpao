@@ -917,8 +917,10 @@ function enviarCliqueWhatsapp(source) {
       utm_campaign: pick('utm_campaign'),
       utm_term: pick('utm_term'),
       utm_content: pick('utm_content'),
-      landing_page_url: window.location.href,
-      user_agent: navigator.userAgent,
+      // O endpoint recusa o corpo inteiro (400) se um campo passar do limite:
+      // landing_page_url 2048 e user_agent 500. Cortar aqui evita perder o clique.
+      landing_page_url: window.location.href.slice(0, 2000),
+      user_agent: (navigator.userAgent || "").slice(0, 480),
     }
 
     Object.keys(payload).forEach((key) => {
